@@ -97,4 +97,12 @@ contract AetherPool is IAetherPool {
         amount1 = -amountSpecified;
         sqrtPriceLimitX96;
     }
+
+    /// @notice Returns the TWAP-based mark value for a given account.
+    /// @dev Satisfies the IAetherPool interface requirement. In this baseline stub, it returns the sum of reserves.
+    /// @param /* account */ The address of the account (unused in this stub implementation).
+    /// @return The calculated TWAP mark value as a uint256.
+    function twapMarkValue(address /* account */) external view returns (uint256) {
+        return uint256(reserve0) + uint256(reserve1);
+    }
 }

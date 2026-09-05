@@ -1,7 +1,7 @@
 [profile.default]
 src = "contracts"
 out = "out"
-libs = ["lib", "node_modules"]
+libs = ["lib", "node_modules", "mocks"]
 solc_version = "0.8.28"
 optimizer = true
 optimizer_runs = 200
@@ -9,6 +9,7 @@ via_ir = true
 ffi = false
 fs_permissions = [{ access = "read", path = "./" }]
 gas_reports = ["AetherVault", "AetherPool", "LiquidationEngine"]
+remappings = ["mocks/=mocks/"]
 
 [profile.default.fmt]
 line_length = 100
