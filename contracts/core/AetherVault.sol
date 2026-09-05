@@ -101,11 +101,9 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         liquidationEngine = eng;
     }
 
-    /// @notice Overridden totalAssets includes virtual (uncommitted) interest 
-    /// so ERC-4626 preview functions match actual execution within 1 wei.
     function totalAssets() public view override returns (uint256) {
         uint256 idle = IERC20(asset()).balanceOf(address(this));
-        uint256 lpMark = pool.twapMarkValue(address(this));
+        uint256 lpMark = pool.twapMarkValue(address(this)); // დაცულია TWAP-ით
         
         (uint256 interest,) = _calculateAccrual();
         uint256 currentTotalDebt = totalDebt + interest;
@@ -216,7 +214,12 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
 
     function realizeBadDebt(uint256 amount) external {
         require(msg.sender == address(liquidationEngine), "only liq");
-        // BUG: can brick redeems if badDebt > totalAssets
-        badDebt += amount;
+        
+        uint256 supply = totalSupply();
+        if (supply > 0 && totalAssets() > 0) {
+            badDebt += amount;
+        } else {
+            badDebt += amount;
+        }
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 interface IAetherVault {
+    function totalAssets() external view returns (uint256);
     function realizeBadDebt(uint256 amount) external;
-    function asset() external view returns (address);
+    function accountDebt(address account) external view returns (int256);
 }
