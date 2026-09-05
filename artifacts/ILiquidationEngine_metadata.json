@@ -1,0 +1,67 @@
+{
+	"compiler": {
+		"version": "0.8.34+commit.80d5c536"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [],
+				"name": "vault",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"details": "Minimal interface for vault wiring. Full liquidation API lives on the engine contract.",
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/interfaces/ILiquidationEngine.sol": "ILiquidationEngine"
+		},
+		"evmVersion": "osaka",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": [
+			":@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+			":@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+			":ds-test/=lib/forge-std/lib/ds-test/src/",
+			":forge-std/=lib/forge-std/src/",
+			":solady/=node_modules/solady/src/",
+			":solmate/=node_modules/solmate/src/"
+		]
+	},
+	"sources": {
+		"contracts/interfaces/ILiquidationEngine.sol": {
+			"keccak256": "0x576793529929bf2e85280ec25331d1ca530c0d49649d868e7321a7798c1115c9",
+			"license": "BUSL-1.1",
+			"urls": [
+				"bzz-raw://4132c32f3cbd5efc7e15e4478a048fda8439ba347561d56779d9287166b27f60",
+				"dweb:/ipfs/QmQe2diu6hGpS9CTxPDwgG4UrYiFdXgRSZZX2M4tg8BLjY"
+			]
+		}
+	},
+	"version": 1
+}

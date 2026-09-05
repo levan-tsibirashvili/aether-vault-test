@@ -1,0 +1,225 @@
+{
+	"id": "71d250306ec37506d7e07361168072a0",
+	"_format": "hh-sol-build-info-1",
+	"solcVersion": "0.8.34",
+	"solcLongVersion": "0.8.34+commit.80d5c536",
+	"input": {
+		"language": "Solidity",
+		"sources": {
+			"contracts/interfaces/ILiquidationEngine.sol": {
+				"content": "// SPDX-License-Identifier: BUSL-1.1\npragma solidity ^0.8.28;\n\n/// @dev Minimal interface for vault wiring. Full liquidation API lives on the engine contract.\ninterface ILiquidationEngine {\n    function vault() external view returns (address);\n}\n"
+			}
+		},
+		"settings": {
+			"optimizer": {
+				"enabled": false,
+				"runs": 200
+			},
+			"outputSelection": {
+				"*": {
+					"": [
+						"ast"
+					],
+					"*": [
+						"abi",
+						"metadata",
+						"devdoc",
+						"userdoc",
+						"storageLayout",
+						"evm.legacyAssembly",
+						"evm.bytecode",
+						"evm.deployedBytecode",
+						"evm.methodIdentifiers",
+						"evm.gasEstimates",
+						"evm.assembly"
+					]
+				}
+			},
+			"remappings": [
+				"@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+				"@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+				"forge-std/=lib/forge-std/src/",
+				"ds-test/=lib/forge-std/lib/ds-test/src/",
+				"solmate/=node_modules/solmate/src/",
+				"solady/=node_modules/solady/src/"
+			]
+		}
+	},
+	"output": {
+		"contracts": {
+			"contracts/interfaces/ILiquidationEngine.sol": {
+				"ILiquidationEngine": {
+					"abi": [
+						{
+							"inputs": [],
+							"name": "vault",
+							"outputs": [
+								{
+									"internalType": "address",
+									"name": "",
+									"type": "address"
+								}
+							],
+							"stateMutability": "view",
+							"type": "function"
+						}
+					],
+					"devdoc": {
+						"details": "Minimal interface for vault wiring. Full liquidation API lives on the engine contract.",
+						"kind": "dev",
+						"methods": {},
+						"version": 1
+					},
+					"evm": {
+						"assembly": "",
+						"bytecode": {
+							"functionDebugData": {},
+							"generatedSources": [],
+							"linkReferences": {},
+							"object": "",
+							"opcodes": "",
+							"sourceMap": ""
+						},
+						"deployedBytecode": {
+							"functionDebugData": {},
+							"generatedSources": [],
+							"immutableReferences": {},
+							"linkReferences": {},
+							"object": "",
+							"opcodes": "",
+							"sourceMap": ""
+						},
+						"gasEstimates": null,
+						"legacyAssembly": null,
+						"methodIdentifiers": {
+							"vault()": "fbfa77cf"
+						}
+					},
+					"metadata": "{\"compiler\":{\"version\":\"0.8.34+commit.80d5c536\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"vault\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"Minimal interface for vault wiring. Full liquidation API lives on the engine contract.\",\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/interfaces/ILiquidationEngine.sol\":\"ILiquidationEngine\"},\"evmVersion\":\"osaka\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[\":@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/\",\":@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":forge-std/=lib/forge-std/src/\",\":solady/=node_modules/solady/src/\",\":solmate/=node_modules/solmate/src/\"]},\"sources\":{\"contracts/interfaces/ILiquidationEngine.sol\":{\"keccak256\":\"0x576793529929bf2e85280ec25331d1ca530c0d49649d868e7321a7798c1115c9\",\"license\":\"BUSL-1.1\",\"urls\":[\"bzz-raw://4132c32f3cbd5efc7e15e4478a048fda8439ba347561d56779d9287166b27f60\",\"dweb:/ipfs/QmQe2diu6hGpS9CTxPDwgG4UrYiFdXgRSZZX2M4tg8BLjY\"]}},\"version\":1}",
+					"storageLayout": {
+						"storage": [],
+						"types": null
+					},
+					"userdoc": {
+						"kind": "user",
+						"methods": {},
+						"version": 1
+					}
+				}
+			}
+		},
+		"sources": {
+			"contracts/interfaces/ILiquidationEngine.sol": {
+				"ast": {
+					"absolutePath": "contracts/interfaces/ILiquidationEngine.sol",
+					"exportedSymbols": {
+						"ILiquidationEngine": [
+							8
+						]
+					},
+					"id": 9,
+					"license": "BUSL-1.1",
+					"nodeType": "SourceUnit",
+					"nodes": [
+						{
+							"id": 1,
+							"literals": [
+								"solidity",
+								"^",
+								"0.8",
+								".28"
+							],
+							"nodeType": "PragmaDirective",
+							"src": "37:24:0"
+						},
+						{
+							"abstract": false,
+							"baseContracts": [],
+							"canonicalName": "ILiquidationEngine",
+							"contractDependencies": [],
+							"contractKind": "interface",
+							"documentation": {
+								"id": 2,
+								"nodeType": "StructuredDocumentation",
+								"src": "63:96:0",
+								"text": "@dev Minimal interface for vault wiring. Full liquidation API lives on the engine contract."
+							},
+							"fullyImplemented": false,
+							"id": 8,
+							"linearizedBaseContracts": [
+								8
+							],
+							"name": "ILiquidationEngine",
+							"nameLocation": "169:18:0",
+							"nodeType": "ContractDefinition",
+							"nodes": [
+								{
+									"functionSelector": "fbfa77cf",
+									"id": 7,
+									"implemented": false,
+									"kind": "function",
+									"modifiers": [],
+									"name": "vault",
+									"nameLocation": "203:5:0",
+									"nodeType": "FunctionDefinition",
+									"parameters": {
+										"id": 3,
+										"nodeType": "ParameterList",
+										"parameters": [],
+										"src": "208:2:0"
+									},
+									"returnParameters": {
+										"id": 6,
+										"nodeType": "ParameterList",
+										"parameters": [
+											{
+												"constant": false,
+												"id": 5,
+												"mutability": "mutable",
+												"name": "",
+												"nameLocation": "-1:-1:-1",
+												"nodeType": "VariableDeclaration",
+												"scope": 7,
+												"src": "234:7:0",
+												"stateVariable": false,
+												"storageLocation": "default",
+												"typeDescriptions": {
+													"typeIdentifier": "t_address",
+													"typeString": "address"
+												},
+												"typeName": {
+													"id": 4,
+													"name": "address",
+													"nodeType": "ElementaryTypeName",
+													"src": "234:7:0",
+													"stateMutability": "nonpayable",
+													"typeDescriptions": {
+														"typeIdentifier": "t_address",
+														"typeString": "address"
+													}
+												},
+												"visibility": "internal"
+											}
+										],
+										"src": "233:9:0"
+									},
+									"scope": 8,
+									"src": "194:49:0",
+									"stateMutability": "view",
+									"virtual": false,
+									"visibility": "external"
+								}
+							],
+							"scope": 9,
+							"src": "159:86:0",
+							"usedErrors": [],
+							"usedEvents": []
+						}
+					],
+					"src": "37:209:0"
+				},
+				"id": 0
+			}
+		}
+	}
+}

@@ -1,0 +1,64 @@
+{
+	"compiler": {
+		"version": "0.8.34+commit.80d5c536"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [],
+				"name": "DimMismatch",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "NotDag",
+				"type": "error"
+			}
+		],
+		"devdoc": {
+			"details": "Fixed-point 1e18 correlation matrix helpers — incomplete.",
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/libraries/RiskBucket.sol": "RiskBucket"
+		},
+		"evmVersion": "osaka",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": [
+			":@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+			":@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+			":ds-test/=lib/forge-std/lib/ds-test/src/",
+			":forge-std/=lib/forge-std/src/",
+			":solady/=node_modules/solady/src/",
+			":solmate/=node_modules/solmate/src/"
+		]
+	},
+	"sources": {
+		"contracts/libraries/RiskBucket.sol": {
+			"keccak256": "0x8a1287f792dd794d7090df6ebe7dd1a6c940daff3ec427cb45da76394e97d4dc",
+			"license": "BUSL-1.1",
+			"urls": [
+				"bzz-raw://0bf1adb0fbc1675be2b99d76c5af5e8863b43fa70ac62db1eff99b0ebf91191f",
+				"dweb:/ipfs/QmQu7dLk657XkmkXwkqFAPHrGhCZzdBSDZvyePA1cg3Fw4"
+			]
+		}
+	},
+	"version": 1
+}

@@ -1,0 +1,4 @@
+{
+  "lib@5.1.0/forge-std/src/Script.sol": ".deps/npm/lib@5.1.0/forge-std/src/Script.sol",
+  "lib@5.1.0/forge-std/src/Test.sol": ".deps/npm/lib@5.1.0/forge-std/src/Test.sol"
+}

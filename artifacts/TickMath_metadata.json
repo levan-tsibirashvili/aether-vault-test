@@ -1,0 +1,53 @@
+{
+	"compiler": {
+		"version": "0.8.34+commit.80d5c536"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [],
+		"devdoc": {
+			"details": "Minimal tick math stub — replace with full Uniswap-style implementation if needed.",
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/libraries/TickMath.sol": "TickMath"
+		},
+		"evmVersion": "osaka",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": [
+			":@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+			":@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+			":ds-test/=lib/forge-std/lib/ds-test/src/",
+			":forge-std/=lib/forge-std/src/",
+			":solady/=node_modules/solady/src/",
+			":solmate/=node_modules/solmate/src/"
+		]
+	},
+	"sources": {
+		"contracts/libraries/TickMath.sol": {
+			"keccak256": "0x53b657ce2e203def2f53c26b5d0622de14d1e3c719647e547e16db2eaec883ec",
+			"license": "BUSL-1.1",
+			"urls": [
+				"bzz-raw://392c56615b9aad0f99f2002b0305bc054e23d845f069e98d931cc4648c61006a",
+				"dweb:/ipfs/QmVHnSfTwjY9e44dPQcBKSH6Bbk6gAUAabJBEMiUPDYBvZ"
+			]
+		}
+	},
+	"version": 1
+}

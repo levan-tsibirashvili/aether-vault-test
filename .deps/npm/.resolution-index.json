@@ -1,0 +1,42 @@
+{
+  "contracts/interfaces/IAetherPool.sol": {
+    "__sources__": {
+      "contracts/interfaces/IAetherPool.sol": {
+        "content": "// SPDX-License-Identifier: BUSL-1.1\npragma solidity ^0.8.28;\n\ninterface IAetherPool {\n    function markValue(address account) external view returns (uint256);\n    function observeTwap(uint32 secondsAgo) external view returns (int24 arithmeticMeanTick);\n    function flashLiquidity(uint256 amount0, uint256 amount1, address receiver, bytes calldata data) external;\n}\n\ninterface IFlashLiquidityReceiver {\n    function onFlashLiquidity(address initiator, uint256 amount0, uint256 amount1, bytes calldata data) external;\n}\n",
+        "file": "contracts/interfaces/IAetherPool.sol"
+      }
+    }
+  },
+  "contracts/interfaces/IAetherVault.sol": {
+    "__sources__": {
+      "contracts/interfaces/IAetherVault.sol": {
+        "content": "// SPDX-License-Identifier: BUSL-1.1\npragma solidity ^0.8.28;\n\ninterface IAetherVault {\n    function realizeBadDebt(uint256 amount) external;\n    function asset() external view returns (address);\n}\n",
+        "file": "contracts/interfaces/IAetherVault.sol"
+      }
+    }
+  },
+  "contracts/interfaces/ILiquidationEngine.sol": {
+    "__sources__": {
+      "contracts/interfaces/ILiquidationEngine.sol": {
+        "content": "// SPDX-License-Identifier: BUSL-1.1\npragma solidity ^0.8.28;\n\n/// @dev Minimal interface for vault wiring. Full liquidation API lives on the engine contract.\ninterface ILiquidationEngine {\n    function vault() external view returns (address);\n}\n",
+        "file": "contracts/interfaces/ILiquidationEngine.sol"
+      }
+    }
+  },
+  "contracts/libraries/RiskBucket.sol": {
+    "__sources__": {
+      "contracts/libraries/RiskBucket.sol": {
+        "content": "// SPDX-License-Identifier: BUSL-1.1\npragma solidity ^0.8.28;\n\n/// @dev Fixed-point 1e18 correlation matrix helpers — incomplete.\nlibrary RiskBucket {\n    struct Bucket {\n        uint256[] assetIds;\n        uint256[][] corr; // n x n, 1e18\n        uint256[] weights; // 1e18\n    }\n\n    error NotDag();\n    error DimMismatch();\n\n    /// @notice Margin ~ sqrt(w^T * C * w) * notional — stub is wrong.\n    function marginRequirement(Bucket memory b, uint256 notional) internal pure returns (uint256) {\n        if (b.weights.length != b.corr.length) revert DimMismatch();\n        // BUG: ignores off-diagonal correlation; candidates must implement quadratic form\n        uint256 sumW;\n        for (uint256 i = 0; i < b.weights.length; i++) {\n            sumW += b.weights[i];\n        }\n        return (notional * sumW) / 1e18;\n    }\n\n    /// @dev TODO(candidate): detect cycles or use iterative convergence with explicit bound.\n    function assertDag(Bucket memory) internal pure {\n        // no-op baseline\n    }\n}\n",
+        "file": "contracts/libraries/RiskBucket.sol"
+      }
+    }
+  },
+  "contracts/libraries/TickMath.sol": {
+    "__sources__": {
+      "contracts/libraries/TickMath.sol": {
+        "content": "// SPDX-License-Identifier: BUSL-1.1\npragma solidity ^0.8.28;\n\n/// @dev Minimal tick math stub — replace with full Uniswap-style implementation if needed.\nlibrary TickMath {\n    int24 internal constant MIN_TICK = -887272;\n    int24 internal constant MAX_TICK = 887272;\n\n    function getSqrtRatioAtTick(int24 tick) internal pure returns (uint160) {\n        require(tick >= MIN_TICK && tick <= MAX_TICK, \"tick\");\n        // Intentionally crude stub for compilation; candidates should not rely on precision.\n        uint256 absTick = uint256(uint24(tick < 0 ? -tick : tick));\n        uint256 ratio = absTick == 0 ? 1 << 96 : (1 << 96) / (1 + absTick / 1000);\n        return uint160(ratio);\n    }\n}\n",
+        "file": "contracts/libraries/TickMath.sol"
+      }
+    }
+  }
+}

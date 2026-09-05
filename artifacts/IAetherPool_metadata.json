@@ -1,0 +1,119 @@
+{
+	"compiler": {
+		"version": "0.8.34+commit.80d5c536"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "amount0",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount1",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "receiver",
+						"type": "address"
+					},
+					{
+						"internalType": "bytes",
+						"name": "data",
+						"type": "bytes"
+					}
+				],
+				"name": "flashLiquidity",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					}
+				],
+				"name": "markValue",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint32",
+						"name": "secondsAgo",
+						"type": "uint32"
+					}
+				],
+				"name": "observeTwap",
+				"outputs": [
+					{
+						"internalType": "int24",
+						"name": "arithmeticMeanTick",
+						"type": "int24"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/interfaces/IAetherPool.sol": "IAetherPool"
+		},
+		"evmVersion": "osaka",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": [
+			":@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+			":@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+			":ds-test/=lib/forge-std/lib/ds-test/src/",
+			":forge-std/=lib/forge-std/src/",
+			":solady/=node_modules/solady/src/",
+			":solmate/=node_modules/solmate/src/"
+		]
+	},
+	"sources": {
+		"contracts/interfaces/IAetherPool.sol": {
+			"keccak256": "0xeca7bed77cc0a658854a1ca318d4f2aa22e5d601d1df6a6ca2b45e89dae29712",
+			"license": "BUSL-1.1",
+			"urls": [
+				"bzz-raw://3330e480f65f13e23be158ccf7f02c3a9ec09c7baad4f00a6d4740c53d213393",
+				"dweb:/ipfs/QmWXppt3WRZFSwTDBsJyKqb6YQvCtBiJ9mWPSSFXh8SDPD"
+			]
+		}
+	},
+	"version": 1
+}

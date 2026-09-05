@@ -1,0 +1,81 @@
+{
+	"compiler": {
+		"version": "0.8.34+commit.80d5c536"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "initiator",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount0",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount1",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bytes",
+						"name": "data",
+						"type": "bytes"
+					}
+				],
+				"name": "onFlashLiquidity",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/interfaces/IAetherPool.sol": "IFlashLiquidityReceiver"
+		},
+		"evmVersion": "osaka",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": [
+			":@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+			":@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+			":ds-test/=lib/forge-std/lib/ds-test/src/",
+			":forge-std/=lib/forge-std/src/",
+			":solady/=node_modules/solady/src/",
+			":solmate/=node_modules/solmate/src/"
+		]
+	},
+	"sources": {
+		"contracts/interfaces/IAetherPool.sol": {
+			"keccak256": "0xeca7bed77cc0a658854a1ca318d4f2aa22e5d601d1df6a6ca2b45e89dae29712",
+			"license": "BUSL-1.1",
+			"urls": [
+				"bzz-raw://3330e480f65f13e23be158ccf7f02c3a9ec09c7baad4f00a6d4740c53d213393",
+				"dweb:/ipfs/QmWXppt3WRZFSwTDBsJyKqb6YQvCtBiJ9mWPSSFXh8SDPD"
+			]
+		}
+	},
+	"version": 1
+}
