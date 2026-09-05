@@ -27,7 +27,7 @@ contract AttackLabsPlaceholder is Test {
     address internal operator = address(0xB0B);
 
     bytes32 internal constant GRANT_OPERATOR_TYPEHASH = keccak256(
-        "GrantOperator(address operator,uint256 until,uint256 nonce,uint256 deadline)"
+        "GrantOperator(address owner,address operator,uint256 until,uint256 nonce,uint256 deadline)"
     );
 
     function setUp() public {
@@ -145,6 +145,7 @@ contract AttackLabsPlaceholder is Test {
         bytes32 structHash = keccak256(
             abi.encode(
                 GRANT_OPERATOR_TYPEHASH,
+                owner,
                 operator,
                 until,
                 nonce,
@@ -179,6 +180,7 @@ contract AttackLabsPlaceholder is Test {
         bytes32 structHash = keccak256(
             abi.encode(
                 GRANT_OPERATOR_TYPEHASH,
+                owner,
                 operator,
                 until,
                 nonce,
@@ -211,6 +213,7 @@ contract AttackLabsPlaceholder is Test {
         bytes32 structHash = keccak256(
             abi.encode(
                 GRANT_OPERATOR_TYPEHASH,
+                owner,
                 operator,
                 until,
                 nonce,
@@ -303,9 +306,10 @@ contract AttackLabsPlaceholder is Test {
         realVault.setLiquidationEngine(ILiquidationEngine(address(engineInstance)));
 
         t0.mint(address(realVault), 1000e18);
+        realVault.setAccountDebt(address(this), 200e18);
         
         vm.prank(address(engineInstance));
-        realVault.realizeBadDebt(100e18);
+        realVault.realizeBadDebt(address(this), 100e18);
 
         uint256 assets = realVault.totalAssets();
         assertTrue(assets >= 0);

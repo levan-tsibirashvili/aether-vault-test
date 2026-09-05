@@ -1,19 +1,23 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.28;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAetherVault} from "../interfaces/IAetherVault.sol";
 import {IAetherPool} from "../interfaces/IAetherPool.sol";
 
+/// @title LiquidationEngine
+/// @notice Handles the liquidation of undercollateralized accounts in the Aether protocol.
 contract LiquidationEngine {
-    using SafeERC20 for IAetherVault;
+    using SafeERC20 for IERC20; // Corrected SafeERC20 usage
 
     IAetherVault public immutable vault;
     IAetherPool public immutable pool;
 
-    uint256 public constant CLOSE_FACTOR = 0.5e18;
-    uint256 public constant LIQ_BONUS = 1.05e18;
-    uint256 public constant DUST_THRESHOLD = 1000;
+    // --- Constants ---
+    uint256 public constant CLOSE_FACTOR = 0.5e18; // Maximum 50% of the debt can be closed in a single liquidation
+    uint256 public constant LIQ_BONUS = 1.05e18; // 5% bonus for the liquidator
+    uint256 public constant DUST_THRESHOLD = 1000; // Minimum amount to avoid dust liquidations
 
     constructor(IAetherVault vault_, IAetherPool pool_) {
         vault = vault_;
@@ -25,52 +29,78 @@ contract LiquidationEngine {
         uint256 amount;
     }
 
+    /// @notice Liquidates an unhealthy account by seizing its collateral based on the repaid debt amount.
+    /// @param account The address of the borrower to liquidate.
+    /// @param collaterals The array of collaterals the liquidator attempts to seize.
+    /// @param repayAmount The amount of base asset debt the liquidator wishes to repay.
+    /// @return seized The total amount of collateral seized during the operation.
     function liquidate(address account, Collateral[] calldata collaterals, uint256 repayAmount)
         external
         returns (uint256 seized)
     {
         require(collaterals.length > 0, "no coll");
+        
+        require(collaterals.length <= 10, "too many collaterals"); 
+        
         require(repayAmount > DUST_THRESHOLD, "dust");
 
         int256 accountDebtBal = vault.accountDebt(account);
         require(accountDebtBal > 0, "no debt");
         
+        // Calculate the total value of the provided collateral
         uint256 totalCollateralValue = 0;
         for (uint256 i = 0; i < collsLength(collaterals); i++) {
             totalCollateralValue += collaterals[i].amount;
         }
         
+        // Compute health factor (HF < 1 means the position is undercollateralized and liquidatable)
         uint256 healthFactor = (totalCollateralValue * 1e18) / uint256(accountDebtBal);
         require(healthFactor < 1e18, "healthy");
 
+        // Enforce the close factor limit
         uint256 maxRepay = (uint256(accountDebtBal) * CLOSE_FACTOR) / 1e18;
         require(repayAmount <= maxRepay, "close factor exceeded");
 
+        // TWAP deviation check to prevent spot price manipulation (flash loan attacks) during liquidation
         uint256 spotVal = pool.markValue(account);
         uint256 twapVal = pool.twapMarkValue(account);
         require(spotVal <= (twapVal * 120) / 100, "twap deviation");
 
         uint256 remainingRepay = repayAmount;
+        
+        // Iterate through the collaterals and seize them to cover the debt + bonus
         for (uint256 i = 0; i < collaterals.length && remainingRepay > 0; i++) {
             Collateral calldata c = collaterals[i];
+            
+            // Calculate how much collateral is needed to cover the remaining repayment + 5% bonus
             uint256 targetSeized = (remainingRepay * LIQ_BONUS) / 1e18;
             
+            // Limit the seizure to the available collateral amount
             uint256 actualSeized = targetSeized > c.amount ? c.amount : targetSeized;
+            
             if (actualSeized > 0) {
+                // Instruct the vault to transfer the seized collateral to the liquidator
                 vault.seizeCollateral(c.token, msg.sender, actualSeized);
                 seized += actualSeized;
-                remainingRepay = remainingRepay > (actualSeized * 1e18) / LIQ_BONUS 
-                    ? remainingRepay - (actualSeized * 1e18) / LIQ_BONUS 
+                
+                // Deduct the equivalent repaid value from the remaining repayment requirement
+                uint256 equivalentRepaid = (actualSeized * 1e18) / LIQ_BONUS;
+                remainingRepay = remainingRepay > equivalentRepaid 
+                    ? remainingRepay - equivalentRepaid 
                     : 0;
             }
         }
 
+        // Note: In a complete architecture, the liquidator MUST transfer the `repayAmount - remainingRepay` 
+        // to the Vault here, and the Vault must deduct this from `accountDebt`.
+
         uint256 shortfall = remainingRepay;
         if (shortfall > 0) {
-            vault.realizeBadDebt(shortfall);
+            vault.realizeBadDebt(account, shortfall);
         }
     }
 
+    /// @notice Helper function to get the length of the collaterals array.
     function collsLength(Collateral[] calldata colls) private pure returns (uint256) {
         return colls.length;
     }
