@@ -36,7 +36,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable {
     error Unhealthy();
     error NotOperator();
 
-/// Initialize Ownable with deployer as initial owner
+    /// Initialize Ownable with deployer as initial owner
     constructor(IERC20 asset_, IAetherPool pool_, string memory name_, string memory symbol_)
         ERC20(name_, symbol_)
         ERC4626(asset_)
@@ -46,7 +46,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable {
         lastAccrual = block.timestamp;
     }
 
-/// Restrict liquidation engine updates to owner only
+    /// Restrict liquidation engine updates to owner only
     function setLiquidationEngine(ILiquidationEngine eng) external onlyOwner{
         liquidationEngine = eng;
     }

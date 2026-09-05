@@ -1,6 +1,4 @@
-@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
-@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 forge-std/=lib/forge-std/src/
-ds-test/=lib/forge-std/lib/ds-test/src/
-solmate/=node_modules/solmate/src/
-solady/=node_modules/solady/src/
+prb-math/=lib/prb-math/src/
+interfaces/=contracts/interfaces/
