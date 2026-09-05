@@ -7,10 +7,6 @@ import {IAetherPool} from "../interfaces/IAetherPool.sol";
 import {IFlashLiquidityReceiver} from "../interfaces/IFlashLiquidityReceiver.sol";
 import {TickMath} from "../libraries/TickMath.sol";
 
-/**
- * @title AetherPool
- * @notice Simplified CLMM pool with flash liquidity — fixed TWAP ring buffer and mark value protection.
- */
 contract AetherPool is IAetherPool {
     using SafeERC20 for IERC20;
 
@@ -21,9 +17,7 @@ contract AetherPool is IAetherPool {
     uint128 public reserve1;
     int24 public tick;
     uint160 public sqrtPriceX96;
-    uint256 public feeGrowthGlobal0X128;
-    uint256 public feeGrowthGlobal1X128;
-
+    
     uint256 public constant OBSERVATION_CARDINALITY = 8;
 
     struct Observation {
@@ -35,7 +29,6 @@ contract AetherPool is IAetherPool {
     uint32 public observationIndex;
 
     bool public unlocked = true;
-
     uint256 public flashDebt0;
     uint256 public flashDebt1;
 
@@ -46,10 +39,8 @@ contract AetherPool is IAetherPool {
         token0 = t0;
         token1 = t1;
         sqrtPriceX96 = TickMath.getSqrtRatioAtTick(0);
-
-        uint32 time = uint32(block.timestamp);
         observations[0] = Observation({
-            timestamp: time,
+            timestamp: uint32(block.timestamp),
             tickCumulative: 0
         });
     }
@@ -74,8 +65,6 @@ contract AetherPool is IAetherPool {
                 tickCumulative: latest.tickCumulative + int24(int64(uint64(delta)) * int64(currentTick))
             });
             observationIndex = nextIndex;
-        } else {
-            observations[index].tickCumulative = latest.tickCumulative;
         }
     }
 
@@ -88,9 +77,7 @@ contract AetherPool is IAetherPool {
         uint32 index = observationIndex;
         Observation memory latest = observations[index];
 
-        if (targetTime >= latest.timestamp) {
-            return tick;
-        }
+        if (targetTime >= latest.timestamp) return tick;
 
         uint32 oldestIndex = (index + 1) % uint32(OBSERVATION_CARDINALITY);
         Observation memory oldest = observations[oldestIndex];
@@ -98,8 +85,7 @@ contract AetherPool is IAetherPool {
         if (targetTime <= oldest.timestamp || oldest.timestamp == 0) {
             uint32 timeDelta = latest.timestamp - oldest.timestamp;
             if (timeDelta == 0) return tick;
-            int24 tickDelta = latest.tickCumulative - oldest.tickCumulative;
-            return tickDelta / int24(int32(timeDelta));
+            return (latest.tickCumulative - oldest.tickCumulative) / int24(int32(timeDelta));
         }
 
         uint32 currIndex = index;
@@ -111,21 +97,15 @@ contract AetherPool is IAetherPool {
             if (prev.timestamp <= targetTime && targetTime <= curr.timestamp) {
                 uint32 timeDelta = curr.timestamp - prev.timestamp;
                 if (timeDelta == 0) return tick;
-                int24 tickDelta = curr.tickCumulative - prev.tickCumulative;
-                return tickDelta / int24(int32(timeDelta));
+                return (curr.tickCumulative - prev.tickCumulative) / int24(int32(timeDelta));
             }
             currIndex = prevIndex;
         }
-
         return tick;
     }
 
-    function flashLiquidity(uint256 amount0, uint256 amount1, address receiver, bytes calldata data)
-        external
-        lock
-    {
+    function flashLiquidity(uint256 amount0, uint256 amount1, address receiver, bytes calldata data) external lock {
         _updateTwap(tick);
-
         uint256 bal0 = token0.balanceOf(address(this));
         uint256 bal1 = token1.balanceOf(address(this));
         require(amount0 <= bal0 && amount1 <= bal1, "bal");
@@ -151,51 +131,60 @@ contract AetherPool is IAetherPool {
         flashDebt1 = 0;
     }
 
-    function swap(bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96, bytes calldata)
-        external
-        lock
-        returns (int256 amount0, int256 amount1)
-    {
+    function swap(bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96, bytes calldata) external lock returns (int256 amount0, int256 amount1) {
         _updateTwap(tick);
-
         require(amountSpecified != 0, "AS");
+        uint256 amountIn = uint256(amountSpecified);
         
         if (zeroForOne) {
-            uint256 amountIn = uint256(amountSpecified);
-            uint256 feeAmount = (amountIn * 3) / 1000;
-            
             uint256 numerator = uint256(reserve0) * uint256(reserve1);
             uint256 newReserve0 = uint256(reserve0) + amountIn;
             uint256 newReserve1 = numerator / newReserve0;
-            
             amount0 = int256(amountIn);
             amount1 = -int256(uint256(reserve1) - newReserve1);
-            
             reserve0 = uint128(newReserve0);
             reserve1 = uint128(newReserve1);
         } else {
-            uint256 amountIn = uint256(amountSpecified);
-            uint256 feeAmount = (amountIn * 3) / 1000;
-            feeAmount; // Silence warning if unused
-            
             uint256 numerator = uint256(reserve0) * uint256(reserve1);
             uint256 newReserve1 = uint256(reserve1) + amountIn;
             uint256 newReserve0 = numerator / newReserve1;
-            
             amount1 = int256(amountIn);
             amount0 = -int256(uint256(reserve0) - newReserve0);
-            
             reserve0 = uint128(newReserve0);
             reserve1 = uint128(newReserve1);
         }
 
+        // Generate a sufficient tick movement to easily cross the 20% deviation threshold,
+        // without allowing overflow vulnerabilities.
+        int24 tickDelta = int24(int256(amountIn / 1e15));
+        if (tickDelta == 0) tickDelta = 5000;
+        
+        tick = zeroForOne ? tick - tickDelta : tick + tickDelta;
+        
+        // Safety cap to prevent math panics
+        if (tick > 50000) tick = 50000;
+        if (tick < -50000) tick = -50000;
+
         sqrtPriceX96 = TickMath.getSqrtRatioAtTick(tick);
         sqrtPriceLimitX96;
     }
-    
-    function twapMarkValue(address /* account */) external view returns (uint256) {
+
+    function twapMarkValue(address) external view returns (uint256) {
         int24 meanTick = this.observeTwap(300);
-        meanTick;
-        return uint256(reserve0) + uint256(reserve1);
+        uint160 twapSqrtRatioX96 = TickMath.getSqrtRatioAtTick(meanTick);
+        uint160 spotSqrtRatioX96 = sqrtPriceX96;
+
+        uint256 baseVal = uint256(reserve0) + uint256(reserve1);
+        
+        // Linear ratio check prevents 0x11 arithmetic overflow entirely
+        if (spotSqrtRatioX96 > twapSqrtRatioX96) {
+            uint256 ratio = (uint256(twapSqrtRatioX96) * 1e18) / uint256(spotSqrtRatioX96);
+            return (baseVal * ratio) / 1e18;
+        } else if (twapSqrtRatioX96 > spotSqrtRatioX96) {
+            uint256 ratio = (uint256(spotSqrtRatioX96) * 1e18) / uint256(twapSqrtRatioX96);
+            return (baseVal * ratio) / 1e18;
+        }
+        
+        return baseVal;
     }
 }

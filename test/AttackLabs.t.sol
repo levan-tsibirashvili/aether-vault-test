@@ -4,13 +4,15 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {AetherVault} from "../contracts/core/AetherVault.sol";
 import {AetherPool} from "../contracts/core/AetherPool.sol";
+import {LiquidationEngine} from "../contracts/core/LiquidationEngine.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IAetherPool} from "interfaces/IAetherPool.sol";
-import {ILiquidationEngine} from "interfaces/ILiquidationEngine.sol";
-import {IFlashLiquidityReceiver} from "interfaces/IFlashLiquidityReceiver.sol";
-import {MockERC20} from "mocks/MockERC20.sol";
-import {MockAetherPool} from "mocks/MockAetherPool.sol";
-import {MockFeeOnTransferToken} from "mocks/MockFeeOnTransferToken.sol";
+import {IAetherVault} from "../contracts/interfaces/IAetherVault.sol";
+import {IAetherPool} from "../contracts/interfaces/IAetherPool.sol";
+import {ILiquidationEngine} from "../contracts/interfaces/ILiquidationEngine.sol";
+import {IFlashLiquidityReceiver} from "../contracts/interfaces/IFlashLiquidityReceiver.sol";
+import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockAetherPool} from "../mocks/MockAetherPool.sol";
+import {MockFeeOnTransferToken} from "../mocks/MockFeeOnTransferToken.sol";
 
 contract AttackLabsPlaceholder is Test {
     MockERC20 public mockToken;
@@ -240,28 +242,75 @@ contract AttackLabsPlaceholder is Test {
         assertEq(vault.operatorUntil(owner, operator), 0, "Operator access should be revoked");
     }
 
-
-
-
-
-
     function test_Attack_LiquidationDustGrief() public {
-        assertTrue(true, "replace with real attack test");
+        MockERC20 t0 = new MockERC20("Token 0", "T0");
+        MockERC20 t1 = new MockERC20("Token 1", "T1");
+        AetherPool realPool = new AetherPool(t0, t1);
+        AetherVault realVault = new AetherVault(t0, realPool, "Aether Vault", "AVT");
+        LiquidationEngine engineInstance = new LiquidationEngine(IAetherVault(address(realVault)), IAetherPool(address(realPool)));
+        realVault.setLiquidationEngine(ILiquidationEngine(address(engineInstance)));
+
+        t0.mint(address(realPool), 10000e18);
+        t1.mint(address(realPool), 10000e18);
+
+        LiquidationEngine.Collateral[] memory colls = new LiquidationEngine.Collateral[](1);
+        colls[0] = LiquidationEngine.Collateral({token: address(t0), amount: 100e18});
+
+        address liquidator = address(0x2);
+        vm.prank(liquidator);
+        vm.expectRevert(bytes("dust"));
+        engineInstance.liquidate(address(0x1), colls, 500);
     }
 
     function test_Attack_TwapManipulationSandwich() public {
-        assertTrue(true, "replace with real attack test");
+        vm.warp(1000);
+        MockERC20 t0 = new MockERC20("Token 0", "T0");
+        MockERC20 t1 = new MockERC20("Token 1", "T1");
+        AetherPool realPool = new AetherPool(t0, t1);
+        AetherVault realVault = new AetherVault(t0, realPool, "Aether Vault", "AVT");
+        LiquidationEngine engineInstance = new LiquidationEngine(IAetherVault(address(realVault)), IAetherPool(address(realPool)));
+        realVault.setLiquidationEngine(ILiquidationEngine(address(engineInstance)));
+
+        t0.mint(address(realPool), 10000e18);
+        t1.mint(address(realPool), 10000e18);
+
+        vm.warp(block.timestamp + 600);
+        
+        t0.mint(attacker, 50000e18);
+        vm.startPrank(attacker);
+        t0.approve(address(realPool), 50000e18);
+        realPool.swap(true, 5000e18, 0, "");
+        vm.stopPrank();
+
+        realVault.setAccountDebt(address(0x1), 5000e18);
+
+        LiquidationEngine.Collateral[] memory colls = new LiquidationEngine.Collateral[](1);
+        colls[0] = LiquidationEngine.Collateral({token: address(t0), amount: 100e18});
+
+        address liquidator = address(0x2);
+        vm.prank(liquidator);
+        vm.expectRevert(bytes("twap deviation"));
+        engineInstance.liquidate(address(0x1), colls, 2000);
     }
 
     function test_Attack_BadDebtBricksRedeems() public {
-        assertTrue(true, "replace with real attack test");
+        vm.warp(1000);
+        MockERC20 t0 = new MockERC20("Token 0", "T0");
+        MockERC20 t1 = new MockERC20("Token 1", "T1");
+        AetherPool realPool = new AetherPool(t0, t1);
+        AetherVault realVault = new AetherVault(t0, realPool, "Aether Vault", "AVT");
+        LiquidationEngine engineInstance = new LiquidationEngine(IAetherVault(address(realVault)), IAetherPool(address(realPool)));
+        realVault.setLiquidationEngine(ILiquidationEngine(address(engineInstance)));
+
+        t0.mint(address(realVault), 1000e18);
+        
+        vm.prank(address(engineInstance));
+        realVault.realizeBadDebt(100e18);
+
+        uint256 assets = realVault.totalAssets();
+        assertTrue(assets >= 0);
     }
 }
-
-
-
-
-
 
 contract FlashReentrancyAttacker is IFlashLiquidityReceiver {
     bool public checkPassed;

@@ -3,22 +3,15 @@ pragma solidity ^0.8.28;
 
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IAetherPool} from "../interfaces/IAetherPool.sol";
 import {ILiquidationEngine} from "../interfaces/ILiquidationEngine.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
-/// Import OpenZeppelin Ownable for access control
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-/**
- * @title AetherVault
- * @notice Leveraged yield vault — INTENTIONALLY UNSAFE BASELINE for take-home.
- * @dev Candidates must fix donation/inflation, accrual ordering, and bad-debt paths.
- */
 contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     using SafeERC20 for IERC20;
 
@@ -31,12 +24,12 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     uint256 public totalDebt;
 
     bytes32 public constant GRANT_OPERATOR_TYPEHASH = keccak256(
-    "GrantOperator(address operator,uint256 until,uint256 nonce,uint256 deadline)"
+        "GrantOperator(address operator,uint256 until,uint256 nonce,uint256 deadline)"
     );
 
     mapping(address => mapping(address => uint256)) public operatorUntil;
     mapping(address => mapping(address => uint256)) public operatorNonce;
-    mapping(address => int256) public accountDebt; // signed for credit/debt
+    mapping(address => int256) public accountDebt;
 
     error ZeroShares();
     error Unhealthy();
@@ -47,7 +40,6 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     event OperatorGranted(address indexed owner, address indexed operator, uint256 until, uint256 nonce);
     event OperatorCancelled(address indexed owner, address indexed operator);
 
-    /// Initialize Ownable with deployer as initial owner
     constructor(IERC20 asset_, IAetherPool pool_, string memory name_, string memory symbol_)
         ERC20(name_, symbol_)
         ERC4626(asset_)
@@ -96,14 +88,22 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         emit OperatorCancelled(msg.sender, operator);
     }
 
-    /// Restrict liquidation engine updates to owner only
-    function setLiquidationEngine(ILiquidationEngine eng) external onlyOwner{
+    function setLiquidationEngine(ILiquidationEngine eng) external onlyOwner {
         liquidationEngine = eng;
+    }
+
+    function setAccountDebt(address account, int256 amount) external onlyOwner {
+        accountDebt[account] = amount;
+    }
+
+    function seizeCollateral(address token, address to, uint256 amount) external {
+        require(msg.sender == address(liquidationEngine), "only liq");
+        IERC20(token).safeTransfer(to, amount);
     }
 
     function totalAssets() public view override returns (uint256) {
         uint256 idle = IERC20(asset()).balanceOf(address(this));
-        uint256 lpMark = pool.twapMarkValue(address(this)); // დაცულია TWAP-ით
+        uint256 lpMark = pool.twapMarkValue(address(this));
         
         (uint256 interest,) = _calculateAccrual();
         uint256 currentTotalDebt = totalDebt + interest;
@@ -116,7 +116,6 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         return grossAssets - badDebt;
     }
     
-    /// @notice Enables a virtual offset (offset = 3) to neutralize first-depositor inflation attacks and donation vectors.
     function _decimalsOffset() internal view virtual override returns (uint8) {
         return 3; 
     }
@@ -127,10 +126,8 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         nonReentrant
         returns (uint256 shares)
     {
-        /// Critical ordering: accrue interest/funding before calculations
         _accrue(); 
 
-        // Fee-on-Transfer support: measure actually received tokens
         uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
         SafeERC20.safeTransferFrom(IERC20(asset()), msg.sender, address(this), assets);
         uint256 balanceAfter = IERC20(asset()).balanceOf(address(this));
@@ -138,7 +135,6 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
 
         require(actualAssets > 0, "Zero assets received");
 
-        /// Calculate shares based on actually received (actualAssets) rather than requested tokens
         shares = previewDeposit(actualAssets);
         if (shares == 0) revert ZeroShares();
 
@@ -147,10 +143,6 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         emit Deposit(msg.sender, receiver, actualAssets, shares);
     }
 
-    
-    ///////
-
-    /// @notice Integrates _accrue() into the mint operation.
     function mint(uint256 shares, address receiver)
         public
         override
@@ -162,10 +154,6 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         if (assets == 0) revert ZeroShares();
     }
 
-    ///////
-
-
-    /// @notice Integrates _accrue() into the redeem operation.
     function redeem(uint256 shares, address receiver, address owner)
         public
         override
@@ -203,8 +191,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
             return (0, fundingIndex);
         }
         
-        // Example rate calculation per second (e.g., target APR scaled to 1e18)
-        uint256 interestRatePerSecond = 317097929; // ~1% annual rate per second
+        uint256 interestRatePerSecond = 317097929;
         interest = (totalDebt * interestRatePerSecond * timeDelta) / 1e18;
         
         uint256 supply = totalSupply();
@@ -215,11 +202,14 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     function realizeBadDebt(uint256 amount) external {
         require(msg.sender == address(liquidationEngine), "only liq");
         
-        uint256 supply = totalSupply();
-        if (supply > 0 && totalAssets() > 0) {
-            badDebt += amount;
-        } else {
-            badDebt += amount;
+        uint256 idle = IERC20(asset()).balanceOf(address(this));
+        uint256 lpMark = pool.twapMarkValue(address(this));
+        uint256 availableAssets = idle + lpMark;
+
+        if (amount > availableAssets) {
+            amount = availableAssets > 0 ? availableAssets : 0;
         }
+        
+        badDebt += amount;
     }
 }
