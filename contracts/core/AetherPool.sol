@@ -62,19 +62,27 @@ contract AetherPool is IAetherPool {
         external
         lock
     {
+        /// CHECKS
         uint256 bal0 = token0.balanceOf(address(this));
         uint256 bal1 = token1.balanceOf(address(this));
         require(amount0 <= bal0 && amount1 <= bal1, "bal");
 
+        /// 1. EFFECTS: Update debt and reduce reserves prior to callback (CEI pattern)
+        flashDebt0 = amount0;
+        flashDebt1 = amount1;
+
+        if (amount0 > 0) reserve0 = uint128(bal0 - amount0);
+        if (amount1 > 0) reserve1 = uint128(bal1 - amount1);
+
+
+        /// 2. INTERACTIONS: Transfer tokens to the receiver before executing the callback
         if (amount0 > 0) token0.safeTransfer(receiver, amount0);
         if (amount1 > 0) token1.safeTransfer(receiver, amount1);
 
-        flashDebt0 = amount0; // fee omitted in baseline
-        flashDebt1 = amount1;
-
+        /// 3. CALLBACK: Execute receiver logic (e.g., arbitrage or liquidation)
         IFlashLiquidityReceiver(receiver).onFlashLiquidity(msg.sender, amount0, amount1, data);
 
-        // BUG: reserve accounting after callback
+        /// 4. VERIFICATION: Ensure full repayment and update final balances
         uint256 bal0After = token0.balanceOf(address(this));
         uint256 bal1After = token1.balanceOf(address(this));
         if (bal0After < bal0 || bal1After < bal1) revert FlashUnpaid();
@@ -83,6 +91,8 @@ contract AetherPool is IAetherPool {
         reserve1 = uint128(bal1After);
         flashDebt0 = 0;
         flashDebt1 = 0;
+
+        
     }
 
     function swap(bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96, bytes calldata)
