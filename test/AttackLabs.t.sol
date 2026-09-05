@@ -10,6 +10,7 @@ import {ILiquidationEngine} from "interfaces/ILiquidationEngine.sol";
 import {IFlashLiquidityReceiver} from "interfaces/IFlashLiquidityReceiver.sol";
 import {MockERC20} from "mocks/MockERC20.sol";
 import {MockAetherPool} from "mocks/MockAetherPool.sol";
+import {MockFeeOnTransferToken} from "mocks/MockFeeOnTransferToken.sol";
 
 /// @dev Attack labs — currently placeholders that document expected names.
 /// Candidates must implement real exploit + fix proofs.
@@ -53,7 +54,6 @@ contract AttackLabsPlaceholder is Test {MockERC20 public mockToken;
         vault.setLiquidationEngine(ILiquidationEngine(mockEngine));
         assertEq(address(vault.liquidationEngine()), mockEngine);
     }
-
 
     function test_Attack_FirstDepositInflation() public {
         /// Setup and balance distribution
@@ -117,6 +117,31 @@ contract AttackLabsPlaceholder is Test {MockERC20 public mockToken;
         realPool.flashLiquidity(borrowAmount0, 0, address(attackerContract), data);
 
         assertTrue(attackerContract.checkPassed(), "Reserves must be updated prior to callback");
+    }
+
+    function test_Deposit_FeeOnTransfer() public {
+        address user = makeAddr("user");
+        MockFeeOnTransferToken fotToken = new MockFeeOnTransferToken("FoT Token", "FOT");
+        AetherVault fotVault = new AetherVault(
+            fotToken,
+            mockPool,
+            "FoT Vault",
+            "aFOT"
+        );
+
+        uint256 depositAmount = 100e18;
+        fotToken.mint(user, depositAmount);
+
+        vm.startPrank(user);
+        fotToken.approve(address(fotVault), depositAmount);
+        
+        uint256 shares = fotVault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // After the 10% transfer fee, the vault should actually receive 90e18
+        uint256 expectedActualAssets = depositAmount - (depositAmount / 10);
+        assertEq(fotToken.balanceOf(address(fotVault)), expectedActualAssets, "Vault should hold net assets after fee");
+        assertGt(shares, 0, "Shares must be minted successfully");
     }
 
 

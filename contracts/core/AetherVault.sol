@@ -82,8 +82,21 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable {
         /// Critical ordering: accrue interest/funding before calculations
         _accrue(); 
 
-        shares = super.deposit(assets, receiver);
+        // Fee-on-Transfer support: measure actually received tokens
+        uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
+        SafeERC20.safeTransferFrom(IERC20(asset()), msg.sender, address(this), assets);
+        uint256 balanceAfter = IERC20(asset()).balanceOf(address(this));
+        uint256 actualAssets = balanceAfter - balanceBefore;
+
+        require(actualAssets > 0, "Zero assets received");
+
+        /// Calculate shares based on actually received (actualAssets) rather than requested tokens
+        shares = previewDeposit(actualAssets);
         if (shares == 0) revert ZeroShares();
+
+        _mint(receiver, shares);
+
+        emit Deposit(msg.sender, receiver, actualAssets, shares);
     }
     
     /// @notice Integrates _accrue() into the mint operation.
