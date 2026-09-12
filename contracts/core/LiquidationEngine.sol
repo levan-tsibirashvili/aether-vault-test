@@ -9,15 +9,15 @@ import {IAetherPool} from "../interfaces/IAetherPool.sol";
 /// @title LiquidationEngine
 /// @notice Handles the liquidation of undercollateralized accounts in the Aether protocol.
 contract LiquidationEngine {
-    using SafeERC20 for IERC20; // Corrected SafeERC20 usage
+    using SafeERC20 for IERC20;
 
     IAetherVault public immutable vault;
     IAetherPool public immutable pool;
 
     // --- Constants ---
-    uint256 public constant CLOSE_FACTOR = 0.5e18; // Maximum 50% of the debt can be closed in a single liquidation
-    uint256 public constant LIQ_BONUS = 1.05e18; // 5% bonus for the liquidator
-    uint256 public constant DUST_THRESHOLD = 1000; // Minimum amount to avoid dust liquidations
+    uint256 public constant CLOSE_FACTOR = 0.5e18; // Maximum 50% of debt can be closed in a single liquidation
+    uint256 public constant LIQ_BONUS = 1.05e18;   // 5% bonus for the liquidator
+    uint256 public constant DUST_THRESHOLD = 1000;  // Minimum amount to avoid dust liquidations
 
     constructor(IAetherVault vault_, IAetherPool pool_) {
         vault = vault_;
@@ -38,65 +38,84 @@ contract LiquidationEngine {
         external
         returns (uint256 seized)
     {
-        require(collaterals.length > 0, "no coll");
+        require(pool.unlocked(), "flash");
+        require(collaterals.length > 0 && collaterals.length <= 12, "coll");
         
-        require(collaterals.length <= 10, "too many collaterals"); 
+        vault.accrue();
         
-        require(repayAmount > DUST_THRESHOLD, "dust");
+        int256 debtI = vault.accountDebt(account);
+        require(debtI > 0, "no debt");
+        uint256 debt = uint256(debtI);
+        
+        uint256 collValue = _collateralValue(collaterals); 
+        uint256 hf = (collValue * 1e18) / debt;
+        require(hf < 1e18, "healthy");
 
-        int256 accountDebtBal = vault.accountDebt(account);
-        require(accountDebtBal > 0, "no debt");
+        uint256 spot = pool.markValue(account);
+        uint256 twap = pool.twapMarkValue(account);
+        require(twap > 0, "oracle");
+        require(spot <= (twap * 120) / 100 && spot >= (twap * 80) / 100, "twap deviation");
+
+        uint256 maxRepay = (hf > CLOSE_FACTOR) ? (debt * CLOSE_FACTOR) / 1e18 : debt;
+        if (collValue <= DUST_THRESHOLD) maxRepay = debt;
+        require(repayAmount > 0 && repayAmount <= maxRepay, "repay");
+
+        // 1. Liquidator repays debt into the vault
+        uint256 received = vault.takeRepayment(msg.sender, repayAmount);
         
-        // Calculate the total value of the provided collateral
-        uint256 totalCollateralValue = 0;
-        for (uint256 i = 0; i < collsLength(collaterals); i++) {
-            totalCollateralValue += collaterals[i].amount;
+        // 2. Reduce the borrower's debt in the vault
+        vault.applyRepayment(account, received);
+
+        // 3. Execute collateral seizure with the 5% liquidation bonus
+        uint256 remaining = (received * LIQ_BONUS) / 1e18;
+        (seized, ) = _executeSeizure(account, remaining);
+
+        // 4. Handle remaining dust / bad debt cleanup if necessary
+        _checkAndRealizeBadDebt(account);
+    }
+    
+    /// @notice Executes the seizure of available collateral tokens across the vault.
+    function _executeSeizure(address account, uint256 initialRemaining) 
+        private 
+        returns (uint256 seized, uint256 remaining) 
+    {
+        remaining = initialRemaining;
+        uint256 length = vault.collateralTokenCount();
+        
+        for (uint256 i = 0; i < length && remaining > 0; ++i) {
+            address tok = vault.collateralTokenAt(i);
+            uint256 bal = vault.collateralOf(account, tok);
+            if (bal == 0) continue;
+            
+            uint256 take = remaining < bal ? remaining : bal;
+            vault.seizeCollateral(tok, msg.sender, take);
+            seized += take;
+            remaining -= take;
         }
-        
-        // Compute health factor (HF < 1 means the position is undercollateralized and liquidatable)
-        uint256 healthFactor = (totalCollateralValue * 1e18) / uint256(accountDebtBal);
-        require(healthFactor < 1e18, "healthy");
+    }
 
-        // Enforce the close factor limit
-        uint256 maxRepay = (uint256(accountDebtBal) * CLOSE_FACTOR) / 1e18;
-        require(repayAmount <= maxRepay, "close factor exceeded");
-
-        // TWAP deviation check to prevent spot price manipulation (flash loan attacks) during liquidation
-        uint256 spotVal = pool.markValue(account);
-        uint256 twapVal = pool.twapMarkValue(account);
-        require(spotVal <= (twapVal * 120) / 100, "twap deviation");
-
-        uint256 remainingRepay = repayAmount;
-        
-        // Iterate through the collaterals and seize them to cover the debt + bonus
-        for (uint256 i = 0; i < collaterals.length && remainingRepay > 0; i++) {
-            Collateral calldata c = collaterals[i];
-            
-            // Calculate how much collateral is needed to cover the remaining repayment + 5% bonus
-            uint256 targetSeized = (remainingRepay * LIQ_BONUS) / 1e18;
-            
-            // Limit the seizure to the available collateral amount
-            uint256 actualSeized = targetSeized > c.amount ? c.amount : targetSeized;
-            
-            if (actualSeized > 0) {
-                // Instruct the vault to transfer the seized collateral to the liquidator
-                vault.seizeCollateral(c.token, msg.sender, actualSeized);
-                seized += actualSeized;
-                
-                // Deduct the equivalent repaid value from the remaining repayment requirement
-                uint256 equivalentRepaid = (actualSeized * 1e18) / LIQ_BONUS;
-                remainingRepay = remainingRepay > equivalentRepaid 
-                    ? remainingRepay - equivalentRepaid 
-                    : 0;
-            }
+    /// @notice Calculates the total collateral value for an account from the vault.
+    function _collateralValue(address account) private view returns (uint256 total) {
+        uint256 length = vault.collateralTokenCount();
+        for (uint256 i = 0; i < length; i++) {
+            address tok = vault.collateralTokenAt(i);
+            total += vault.collateralOf(account, tok);
         }
+    }
+    
+    /// @notice Calculates the total value from a provided Collateral struct array.
+    function _collateralValue(Collateral[] calldata collaterals) private pure returns (uint256 total) {
+        uint256 length = collaterals.length;
+        for (uint256 i = 0; i < length; i++) {
+            total += collaterals[i].amount;
+        }
+    }
 
-        // Note: In a complete architecture, the liquidator MUST transfer the `repayAmount - remainingRepay` 
-        // to the Vault here, and the Vault must deduct this from `accountDebt`.
-
-        uint256 shortfall = remainingRepay;
-        if (shortfall > 0) {
-            vault.realizeBadDebt(account, shortfall);
+    /// @notice Checks if debt remains and collateral is below dust threshold to realize bad debt.
+    function _checkAndRealizeBadDebt(address account) private {
+        uint256 debtLeft = uint256(vault.accountDebt(account));
+        if (debtLeft > 0 && _collateralValue(account) <= DUST_THRESHOLD) {
+            vault.realizeBadDebt(account, debtLeft);
         }
     }
 
