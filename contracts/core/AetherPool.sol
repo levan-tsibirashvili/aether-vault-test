@@ -8,35 +8,63 @@ import {IFlashLiquidityReceiver} from "../interfaces/IFlashLiquidityReceiver.sol
 import {TickMath} from "../libraries/TickMath.sol";
 
 /// @title AetherPool
-/// @notice A custom Automated Market Maker (AMM) pool supporting TWAP, flash liquidity, and constant-product style swaps.
+/// @author Aether Protocol Core Team
+/// @notice A custom Automated Market Maker (AMM) liquidity pool supporting Time-Weighted Average Price (TWAP), 
+///         uncollateralized flash liquidity, and constant-product style token swaps.
 contract AetherPool is IAetherPool {
     using SafeERC20 for IERC20;
 
+    /// @notice The first ERC-20 token asset of the pool pair (token0).
     IERC20 public immutable token0;
+    
+    /// @notice The second ERC-20 token asset of the pool pair (token1).
     IERC20 public immutable token1;
 
+    /// @notice The reserve balance tracking amount of token0 held in the pool.
     uint128 public reserve0;
+    
+    /// @notice The reserve balance tracking amount of token1 held in the pool.
     uint128 public reserve1;
+    
+    /// @notice The current discrete tick representing the price ratio of the pool.
     int24 public tick;
+    
+    /// @notice The current square root price ratio represented in Q96 fixed-point format.
     uint160 public sqrtPriceX96;
     
+    /// @notice The fixed observation cardinality defining the ring buffer size for TWAP tracking.
     uint256 public constant OBSERVATION_CARDINALITY = 8;
 
+    /// @notice Structure representing a single historical TWAP oracle observation point.
     struct Observation {
         uint32 timestamp;
         int56 tickCumulative;
     }
 
+    /// @notice Circular ring buffer storing historical oracle observations.
     Observation[8] public observations;
+    
+    /// @notice The current index pointer within the observation ring buffer.
     uint32 public observationIndex;
 
+    /// @notice Reentrancy lock flag; true when the pool is unlocked, false when locked.
     bool public unlocked = true;
+    
+    /// @notice Outstanding flash loan debt quantity for token0 during an active flash liquidity call.
     uint256 public flashDebt0;
+    
+    /// @notice Outstanding flash loan debt quantity for token1 during an active flash liquidity call.
     uint256 public flashDebt1;
 
+    /// @notice Reverts when a reentrant or locked pool execution is attempted.
     error Locked();
+    
+    /// @notice Reverts when a flash liquidity loan is not fully repaid upon completion.
     error FlashUnpaid();
 
+    /// @notice Initializes the pool with token pair addresses and sets initial price ratios and observation points.
+    /// @param t0 The address of token0.
+    /// @param t1 The address of token1.
     constructor(IERC20 t0, IERC20 t1) {
         token0 = t0;
         token1 = t1;
@@ -47,7 +75,7 @@ contract AetherPool is IAetherPool {
         });
     }
 
-    /// @dev Simple reentrancy guard. Removed from `swap` to allow nested swaps during flash loans.
+    /// @dev Simple reentrancy guard modifier. Temporarily removed from `swap` to allow nested arbitrage callbacks during flash loans.
     modifier lock() {
         if (!unlocked) revert Locked();
         unlocked = false;
@@ -55,8 +83,8 @@ contract AetherPool is IAetherPool {
         unlocked = true;
     }
 
-    /// @notice Updates the Time-Weighted Average Price (TWAP) accumulator
-    /// @param currentTick The current tick value before any state changes
+    /// @notice Updates the Time-Weighted Average Price (TWAP) accumulator ring buffer.
+    /// @param currentTick The current discrete tick value before executing state changes.
     function _updateTwap(int24 currentTick) internal {
         uint32 time = uint32(block.timestamp);
         uint32 index = observationIndex;
@@ -73,15 +101,15 @@ contract AetherPool is IAetherPool {
         }
     }
 
-    /// @notice Returns the raw sum of pool reserves
-    /// @return The combined total of reserve0 and reserve1
+    /// @notice Returns the raw unweighted sum of pool token reserves.
+    /// @return The combined total of reserve0 and reserve1.
     function markValue(address) external view returns (uint256) {
         return uint256(reserve0) + uint256(reserve1);
     }
 
-    /// @notice Calculates the arithmetic mean tick over a given time period
-    /// @param secondsAgo The number of seconds in the past to start the TWAP calculation
-    /// @return arithmeticMeanTick The time-weighted average tick
+    /// @notice Calculates the arithmetic mean tick over a given time period in the past.
+    /// @param secondsAgo The number of seconds in the past to start the TWAP calculation window.
+    /// @return arithmeticMeanTick The time-weighted average tick over the specified duration.
     function observeTwap(uint32 secondsAgo) external view returns (int24 arithmeticMeanTick) {
         uint32 targetTime = uint32(block.timestamp) - secondsAgo;
         uint32 index = observationIndex;
@@ -114,11 +142,11 @@ contract AetherPool is IAetherPool {
         return tick;
     }
 
-    /// @notice Provides uncollateralized flash liquidity to a receiver address
-    /// @param amount0 The amount of token0 to borrow
-    /// @param amount1 The amount of token1 to borrow
-    /// @param receiver The address receiving the flash liquidity
-    /// @param data Arbitrary data passed to the receiver's callback
+    /// @notice Provides uncollateralized flash liquidity to a designated receiver address with callback support.
+    /// @param amount0 The quantity of token0 to borrow.
+    /// @param amount1 The quantity of token1 to borrow.
+    /// @param receiver The receiver contract address implementing `IFlashLiquidityReceiver`.
+    /// @param data Arbitrary payload data passed directly to the receiver's callback function.
     function flashLiquidity(uint256 amount0, uint256 amount1, address receiver, bytes calldata data) external lock {
         _updateTwap(tick);
         uint256 bal0 = token0.balanceOf(address(this));
@@ -146,13 +174,13 @@ contract AetherPool is IAetherPool {
         flashDebt1 = 0;
     }
 
-    /// @notice Swaps tokens in the pool
-    /// @dev Removed 'lock' modifier to allow arbitrage callbacks during flash loans.
-    /// @param zeroForOne True if swapping token0 for token1, false otherwise
-    /// @param amountSpecified The exact amount of input tokens to swap
-    /// @param sqrtPriceLimitX96 The price limit for the swap (currently unused)
-    /// @return amount0 The delta of token0 balance
-    /// @return amount1 The delta of token1 balance
+    /// @notice Executes token swaps within the pool following constant-product AMM mechanics.
+    /// @dev The reentrancy lock modifier is omitted to allow necessary arbitrage callbacks during flash loans.
+    /// @param zeroForOne True if swapping token0 for token1, false if swapping token1 for token0.
+    /// @param amountSpecified The exact input amount of tokens to swap.
+    /// @param sqrtPriceLimitX96 The price limit restriction boundary for the swap execution.
+    /// @return amount0 The balance delta for token0.
+    /// @return amount1 The balance delta for token1.
     function swap(bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96, bytes calldata) external returns (int256 amount0, int256 amount1) {
         _updateTwap(tick);
         require(amountSpecified > 0, "AS"); // Only positive input amounts are supported
@@ -194,6 +222,7 @@ contract AetherPool is IAetherPool {
         tokenOut.safeTransfer(msg.sender, amountOut);
     }
 
+    /// @notice Recalculates and updates the internal discrete tick and square root price based on current reserves.
     function _setTickFromReserves() internal {
         if (reserve0 == 0) return;
         
@@ -211,6 +240,9 @@ contract AetherPool is IAetherPool {
         sqrtPriceX96 = TickMath.getSqrtRatioAtTick(tick);
     }
 
+    /// @notice Deposits liquidity into the pool, increasing reserves and updating pricing metrics.
+    /// @param amount0 The quantity of token0 liquidity to add.
+    /// @param amount1 The quantity of token1 liquidity to add.
     function addLiquidity(uint256 amount0, uint256 amount1) external {
         _updateTwap(tick);
         
@@ -231,8 +263,8 @@ contract AetherPool is IAetherPool {
         _setTickFromReserves();
     }
 
-    /// @notice Calculates the total value of pool reserves adjusted by the TWAP ratio
-    /// @return The adjusted TWAP mark value of the pool
+    /// @notice Calculates the total value of pool reserves adjusted by the 5-minute TWAP price ratio.
+    /// @return The adjusted TWAP mark value of the pool reserves.
     function twapMarkValue(address) external view returns (uint256) {
         int24 meanTick = this.observeTwap(300); // 5-minute TWAP window
         uint160 twapSqrtRatioX96 = TickMath.getSqrtRatioAtTick(meanTick);
@@ -240,7 +272,7 @@ contract AetherPool is IAetherPool {
 
         uint256 baseVal = uint256(reserve0) + uint256(reserve1);
         
-        // Linear ratio check prevents 0x11 arithmetic overflow entirely
+        // Linear ratio check prevents arithmetic overflow entirely
         if (spotSqrtRatioX96 > twapSqrtRatioX96) {
             uint256 ratio = (uint256(twapSqrtRatioX96) * 1e18) / uint256(spotSqrtRatioX96);
             return (baseVal * ratio) / 1e18;
