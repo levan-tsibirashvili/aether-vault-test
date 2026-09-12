@@ -121,20 +121,14 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
 
     /// @notice Calculates the total assets managed by the vault
     function totalAssets() public view override returns (uint256) {
-        uint256 idle = IERC20(asset()).balanceOf(address(this));
-        uint256 lpMark = pool.twapMarkValue(address(this));
+        uint256 lpMark = pool.unlocked() ? pool.twapMarkValue(address(this)) : cachedLpMark;
         
         (uint256 interest, , ) = _calculateAccrual();
-        uint256 currentTotalDebt = totalDebt + interest;
-                
-        uint256 grossAssets = idle + lpMark + currentTotalDebt;
-        if (grossAssets < badDebt) {
-            return 0;
-        }
+        uint256 performing = totalDebt + interest; 
         
-        return grossAssets - badDebt;
+        return trackedCash + lpMark + performing;
     }
-    
+        
     function _decimalsOffset() internal view virtual override returns (uint8) {
         return 3; 
     }
@@ -247,7 +241,9 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     /// @param account The address of the user whose debt is being realized
     /// @param amount The amount of debt to realize
     function realizeBadDebt(address account, uint256 amount) external {
-        require(msg.sender == address(liquidationEngine), "only liq");        
+        require(msg.sender == address(liquidationEngine), "only liq");
+        require(amount <= uint256(type(int256).max), "amount"); // უსაფრთხოების შემოწმება ქასთინგისთვის
+        
         badDebt += amount;
         
         int256 iAmount = int256(amount);
@@ -263,6 +259,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
             totalDebt = 0;
         }
         
+        // totalDebtAccrued რჩება უცვლელი ინვარიანტის შესანარჩუნებლად
         emit BadDebtRealized(account, amount);
     }
 }
