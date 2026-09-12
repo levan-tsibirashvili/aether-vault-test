@@ -75,6 +75,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         bytes32 s
     ) external {
         if (block.timestamp > deadline) revert Expired();
+        if (until <= block.timestamp) revert Expired();
 
         uint256 currentNonce = operatorNonce[owner][operator];
 
@@ -188,6 +189,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         nonReentrant
         returns (uint256 assets)
     {
+        _requireOwnerOrOperator(owner);
         _accrue();
         assets = super.redeem(shares, receiver, owner);
     }
@@ -198,6 +200,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         nonReentrant
         returns (uint256 shares)
     {
+        _requireOwnerOrOperator(owner);
         _accrue();
         shares = super.withdraw(assets, receiver, owner);
     }
@@ -261,5 +264,15 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         
         // totalDebtAccrued რჩება უცვლელი ინვარიანტის შესანარჩუნებლად
         emit BadDebtRealized(account, amount);
+    }
+
+    /// @notice Checks whether the operator has active access and
+    function isOperator(address account, address operator) public view returns (bool) {
+        return operatorUntil[account][operator] >= block.timestamp;
+    }
+
+    /// @notice restricts the function if the caller is not the owner or a valid operator
+    function _requireOwnerOrOperator(address account) internal view {
+        if (msg.sender != account && !isOperator(account, msg.sender)) revert NotOperator();
     }
 }
