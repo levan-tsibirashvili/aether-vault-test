@@ -11,6 +11,7 @@ import {ILiquidationEngine} from "../interfaces/ILiquidationEngine.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title AetherVault
 /// @notice ERC4626 Leverage Vault with customized EIP712 operator grants and debt accounting.
@@ -22,13 +23,16 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
 
     // --- State Variables ---
     uint256 public fundingIndex = 1e18; 
-    uint256 public borrowIndex = 1e18; // [FIX 5]: Added borrowIndex for accurate borrower debt tracking
-    uint256 public lastAccrual;
-    
+    uint256 public borrowIndex = 1e18; // Added borrowIndex for accurate borrower debt tracking
+    uint256 public lastAccrual;    
     uint256 public badDebt;
     uint256 public totalDebt;
+    uint256 public trackedCash;       
+    uint256 public totalDebtAccrued;  
+    uint256 public cachedLpMark;
+    uint256 public liquidationLock;
 
-    // [FIX 3]: Added 'owner' parameter to the TYPEHASH for cryptographic replay protection
+    // Added 'owner' parameter to the TYPEHASH for cryptographic replay protection
     bytes32 public constant GRANT_OPERATOR_TYPEHASH = keccak256(
         "GrantOperator(address owner,address operator,uint256 until,uint256 nonce,uint256 deadline)"
     );
@@ -47,7 +51,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     // --- Events ---
     event OperatorGranted(address indexed owner, address indexed operator, uint256 until, uint256 nonce);
     event OperatorCancelled(address indexed owner, address indexed operator);
-    event BadDebtRealized(address indexed account, uint256 amount); // [FIX 4]: New event for tracking bad debt
+    event BadDebtRealized(address indexed account, uint256 amount); // New event for tracking bad debt
 
     constructor(IERC20 asset_, IAetherPool pool_, string memory name_, string memory symbol_)
         ERC20(name_, symbol_)
@@ -60,7 +64,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     }
 
     /// @notice Grants operator permissions using an EIP-712 signature
-    /// @dev [FIX 3] The owner's address is now integrated into the struct hash
+    /// @dev The owner's address is now integrated into the struct hash
     function grantOperator(
         address owner,
         address operator,
@@ -77,7 +81,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         bytes32 structHash = keccak256(
             abi.encode(
                 GRANT_OPERATOR_TYPEHASH,
-                owner, // [FIX 3]: Owner is now securely part of the hashed data
+                owner, // Owner is now securely part of the hashed data
                 operator,
                 until,
                 currentNonce,
@@ -143,21 +147,34 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         nonReentrant
         returns (uint256 shares)
     {
-        _accrue(); 
-
-        uint256 balanceBefore = IERC20(asset()).balanceOf(address(this));
+        if (assets == 0) revert ZeroShares();
+        _accrue();
+        
+        cachedLpMark = pool.unlocked() ? pool.twapMarkValue(address(this)) : cachedLpMark;
+        
+        uint256 assetsBefore = totalAssets();
+        uint256 supplyBefore = totalSupply();
+        
+        uint256 balBefore = IERC20(asset()).balanceOf(address(this));
         SafeERC20.safeTransferFrom(IERC20(asset()), msg.sender, address(this), assets);
-        uint256 balanceAfter = IERC20(asset()).balanceOf(address(this));
-        uint256 actualAssets = balanceAfter - balanceBefore;
-
-        require(actualAssets > 0, "Zero assets received");
-
-        shares = previewDeposit(actualAssets);
+        uint256 received = IERC20(asset()).balanceOf(address(this)) - balBefore;
+        
+        if (received == 0) revert ZeroShares();
+        
+        trackedCash += received;
+        
+        shares = Math.mulDiv(
+            received,
+            supplyBefore + 10 ** _decimalsOffset(),
+            assetsBefore + 1,
+            Math.Rounding.Floor
+        );
+        
         if (shares == 0) revert ZeroShares();
 
         _mint(receiver, shares);
 
-        emit Deposit(msg.sender, receiver, actualAssets, shares);
+        emit Deposit(msg.sender, receiver, received, shares);
     }
 
     function mint(uint256 shares, address receiver)
@@ -201,7 +218,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         
         if (interest > 0) {
             totalDebt += interest;
-            borrowIndex = newBorrowIndex; // [FIX 5]: Update global borrower index
+            borrowIndex = newBorrowIndex; // Update global borrower index
             fundingIndex = newFundingIndex;
         }
         lastAccrual = block.timestamp;
@@ -226,7 +243,7 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
     }
 
     /// @notice Realizes a specific user's debt as unrecoverable (Bad Debt)
-    /// @dev [FIX 4] Decreases both totalDebt and accountDebt to strictly maintain system invariants
+    /// @dev Decreases both totalDebt and accountDebt to strictly maintain system invariants
     /// @param account The address of the user whose debt is being realized
     /// @param amount The amount of debt to realize
     function realizeBadDebt(address account, uint256 amount) external {
