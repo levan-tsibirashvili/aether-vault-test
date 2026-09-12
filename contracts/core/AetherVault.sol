@@ -166,6 +166,18 @@ contract AetherVault is ERC4626, ReentrancyGuard, Ownable, EIP712 {
         emit OperatorCancelled(msg.sender, operator);
     }
 
+    /// @notice Handles debt repayment transfer from the liquidator into the vault.
+    /// @param from The address paying off the debt (the liquidator).
+    /// @param amount The quantity of underlying assets to transfer.
+    /// @return received The actual net amount received by the vault.
+    function takeRepayment(address from, uint256 amount) external returns (uint256 received) {
+        require(msg.sender == address(liquidationEngine), "only liq");
+        uint256 balBefore = IERC20(asset()).balanceOf(address(this));
+        IERC20(asset()).safeTransferFrom(from, address(this), amount);
+        received = IERC20(asset()).balanceOf(address(this)) - balBefore;
+        trackedCash += received;
+    }
+
     /// @notice Sets or updates the authorized liquidation engine address.
     /// @param eng The new liquidation engine contract interface implementation.
     function setLiquidationEngine(ILiquidationEngine eng) external onlyOwner {
