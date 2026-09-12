@@ -24,7 +24,7 @@ contract AetherPool is IAetherPool {
 
     struct Observation {
         uint32 timestamp;
-        int24 tickCumulative;
+        int56 tickCumulative;
     }
 
     Observation[8] public observations;
@@ -95,7 +95,7 @@ contract AetherPool is IAetherPool {
         if (targetTime <= oldest.timestamp || oldest.timestamp == 0) {
             uint32 timeDelta = latest.timestamp - oldest.timestamp;
             if (timeDelta == 0) return tick;
-            return (latest.tickCumulative - oldest.tickCumulative) / int24(int32(timeDelta));
+            return int24((latest.tickCumulative - oldest.tickCumulative) / int56(uint56(timeDelta)));
         }
 
         uint32 currIndex = index;
@@ -107,7 +107,7 @@ contract AetherPool is IAetherPool {
             if (prev.timestamp <= targetTime && targetTime <= curr.timestamp) {
                 uint32 timeDelta = curr.timestamp - prev.timestamp;
                 if (timeDelta == 0) return tick;
-                return (curr.tickCumulative - prev.tickCumulative) / int24(int32(timeDelta));
+                return int24((curr.tickCumulative - prev.tickCumulative) / int56(int32(timeDelta)));
             }
             currIndex = prevIndex;
         }
@@ -147,7 +147,7 @@ contract AetherPool is IAetherPool {
     }
 
     /// @notice Swaps tokens in the pool
-    /// @dev [FIX 2]: Removed 'lock' modifier to allow arbitrage callbacks during flash loans.
+    /// @dev Removed 'lock' modifier to allow arbitrage callbacks during flash loans.
     /// @param zeroForOne True if swapping token0 for token1, false otherwise
     /// @param amountSpecified The exact amount of input tokens to swap
     /// @param sqrtPriceLimitX96 The price limit for the swap (currently unused)
@@ -187,21 +187,48 @@ contract AetherPool is IAetherPool {
 
         reserve0 = uint128(newReserve0);
         reserve1 = uint128(newReserve1);
+        
+        _setTickFromReserves();
+        sqrtPriceLimitX96; 
+        
+        tokenOut.safeTransfer(msg.sender, amountOut);
+    }
 
-        // Synthetic tick movement generation (vulnerable to manipulation if not properly bounded)
-        int24 tickDelta = int24(int256(actualAmountIn / 1e15));
-        if (tickDelta == 0) tickDelta = 5000;
+    function _setTickFromReserves() internal {
+        if (reserve0 == 0) return;
         
-        tick = zeroForOne ? tick - tickDelta : tick + tickDelta;
+        uint256 p = (uint256(reserve1) * 1e18) / uint256(reserve0);
         
-        // Safety cap to prevent TickMath panics
+        if (p >= 1e18) {
+            tick = int24(int256((p - 1e18) / 1e14));
+        } else {
+            tick = -int24(int256((1e18 - p) / 1e14));
+        }
+        
         if (tick > 50000) tick = 50000;
         if (tick < -50000) tick = -50000;
-
+        
         sqrtPriceX96 = TickMath.getSqrtRatioAtTick(tick);
-        sqrtPriceLimitX96; // Suppress unused variable warning safely
+    }
 
-        tokenOut.safeTransfer(msg.sender, amountOut);
+    function addLiquidity(uint256 amount0, uint256 amount1) external {
+        _updateTwap(tick);
+        
+        uint256 b0 = token0.balanceOf(address(this));
+        uint256 b1 = token1.balanceOf(address(this));
+        
+        token0.safeTransferFrom(msg.sender, address(this), amount0);
+        token1.safeTransferFrom(msg.sender, address(this), amount1);
+        
+        uint256 a0 = token0.balanceOf(address(this)) - b0;
+        uint256 a1 = token1.balanceOf(address(this)) - b1;
+        
+        require(a0 > 0 && a1 > 0, "liq");
+        
+        reserve0 = uint128(uint256(reserve0) + a0);
+        reserve1 = uint128(uint256(reserve1) + a1);
+        
+        _setTickFromReserves();
     }
 
     /// @notice Calculates the total value of pool reserves adjusted by the TWAP ratio
