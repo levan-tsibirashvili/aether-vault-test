@@ -14,4 +14,6 @@ contract MockAetherPool is IAetherPool {
     function twapMarkValue(address) external view override returns (uint256) { return mockTwapMarkValue; }
     function flashLiquidity(uint256, uint256, address, bytes calldata) external override {}
     function observeTwap(uint32) external view override returns (int24 arithmeticMeanTick) { return 0; }
+
+    function unlocked() external pure override returns (bool) { return true; }
 }
